@@ -1,0 +1,196 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('../app');
+var debug = require('debug')('node-websocket:server');
+var http = require('http');
+var moment = require('moment');
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+// ---------------------------------------------------------------------------socket.io实现方式-------------------------------------------------------------------
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+var io = require('socket.io');
+var ws = io.listen(server);
+ws.on('connection', function (client) {
+    console.log('\033[96msomeone is connect\033[39m \n');
+    client.on('join', function (msg) {
+        // 检查是否有重复
+        if (checkNickname(msg)) {
+            client.emit('nickname', '昵称有重复!');
+        } else {
+            client.nickname = msg;
+            ws.sockets.emit('announcement', '系统', msg + ' 加入了聊天室!');
+        }
+    });
+    // 监听发送消息
+    client.on('send.message', function (msg) {
+        client.broadcast.emit('send.message', client.nickname, msg);
+    });
+    // 断开连接时，通知其它用户
+    client.on('disconnect', function () {
+        if (client.nickname) {
+            client.broadcast.emit('send.message', '系统', client.nickname + '离开聊天室!');
+        }
+    })
+});
+
+// 检查昵称是否重复
+var checkNickname = function (name) {
+    for (var k in ws.sockets.sockets) {
+        if (ws.sockets.sockets.hasOwnProperty(k)) {
+            if (ws.sockets.sockets[k] && ws.sockets.sockets[k].nickname == name) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------------ws实现方式-------------------------------------------------------------------
+var WebSocketServer = require('ws').Server;
+var wss = new WebSocketServer({
+    //监听接口  
+    port: 3001,
+    //可选，验证连接函数
+    verifyClient: socketVerify
+});
+
+//传入的info参数会包括这个连接的很多信息，你可以在此处使用console.log(info)来查看和选择如何验证连接 
+function socketVerify(info) {
+    console.log(info.origin);
+    console.log(info.req.t);
+    console.log(info.secure);
+    //否则拒绝 
+    return true;
+}
+
+var auctionList = [];
+var maxMoney = 0;
+
+//广播  
+wss.broadcast = function broadcast(s, obj) {
+    wss.clients.forEach(function each(client) {
+        if (obj.auctionMoney) {
+            var list = auctionList.sort();
+            if (obj.auctionMoney > maxMoney) {
+                list.push({
+                    username: obj.username,
+                    auctionMoney: Number(obj.auctionMoney),
+                    lastDate: moment().format("YYYY-MM-DD HH:mm:ss")
+                });
+                maxMoney = Number(obj.auctionMoney);
+            };
+            auctionList = list;
+        }
+        if (s == 1) {
+            client.send(JSON.stringify({ auctionList: auctionList, maxMoney: maxMoney }));
+        }
+        if (s == 0) {
+            client.send(ws + "退出聊天室");
+        }
+    });
+};
+// 初始化  
+wss.on('connection', function (ws) {
+    ws.send(JSON.stringify({ online: wss.clients.length, auctionList: auctionList, maxMoney: maxMoney }));
+    // 发送消息  
+    ws.on('message', function (jsonStr, flags) {
+        var obj = JSON.parse(jsonStr);
+        this.user = obj;
+        if (typeof this.user.auctionMoney != "undefined") {
+            wss.broadcast(1, obj);
+        }
+    });
+    // 退出聊天  
+    ws.on('close', function (close) {
+        try {
+            wss.broadcast(0, this.user.name);
+        } catch (e) {
+            console.log('刷新页面了');
+        }
+    });
+});
+
+
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+    var port = parseInt(val, 10);
+
+    if (isNaN(port)) {
+        // named pipe
+        return val;
+    }
+
+    if (port >= 0) {
+        // port number
+        return port;
+    }
+
+    return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+    if (error.syscall !== 'listen') {
+        throw error;
+    }
+
+    var bind = typeof port === 'string'
+        ? 'Pipe ' + port
+        : 'Port ' + port;
+
+    // handle specific listen errors with friendly messages
+    switch (error.code) {
+        case 'EACCES':
+            console.error(bind + ' requires elevated privileges');
+            process.exit(1);
+            break;
+        case 'EADDRINUSE':
+            console.error(bind + ' is already in use');
+            process.exit(1);
+            break;
+        default:
+            throw error;
+    }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+    var addr = server.address();
+    var bind = typeof addr === 'string'
+        ? 'pipe ' + addr
+        : 'port ' + addr.port;
+    debug('Listening on ' + bind);
+}

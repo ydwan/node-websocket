@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>
+    <%= title %>
+  </title>
+  <link rel='stylesheet' href='/stylesheets/style.css' />
+</head>
+
+<body>
+  <div class="wrapper">
+    <div class="content" id="chat">
+      <ul id="chat_conatiner">
+      </ul>
+    </div>
+    <div class="action">
+      <textarea></textarea>
+      <button class="btn btn-success" id="clear">清屏</button>
+      <button class="btn btn-success" id="send">发送</button>
+    </div>
+  </div>
+  <script type="text/javascript" src="/javascripts/vue.js"></script>
+  <script type="text/javascript" src="/javascripts/socket.io.js"></script>
+  <script type="text/javascript" src="/javascripts/client-socket.js"></script>
+</body>
+
+</html>
