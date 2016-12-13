@@ -5,9 +5,13 @@ node下的websocket demo
 <code>npm install</code>
 
 ###socket.io模块：
-    访问地址:<code>http://localhost:3000</code>
+<pre>
+    访问地址:http://localhost:3000
+</pre>
 
 
 
 ###ws模块：
-    访问地址:<code>http://localhost:3000/ws</code>
+<pre>
+    访问地址:http://localhost:3000/ws
+</pre>
